@@ -1,0 +1,573 @@
+services:
+
+  # Config servers
+  configSrv1:
+    image: mongo:latest
+    container_name: configSrv1
+    restart: always
+    ports:
+      - "27017:27017"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - configSrv1-data:/data/db
+    command:
+      [
+        "--configsvr",
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27017"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27017 --quiet || exit 1
+      interval: 10s
+      start_period: 40s
+
+  configSrv2:
+    image: mongo:latest
+    container_name: configSrv2
+    restart: always
+    ports:
+      - "27018:27018"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - configSrv2-data:/data/db
+    command:
+      [
+        "--configsvr",
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27018"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27018 --quiet || exit 1
+      interval: 10s
+      start_period: 40s
+
+  configSrv3:
+    image: mongo:latest
+    container_name: configSrv3
+    restart: always
+    ports:
+      - "27019:27019"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - configSrv3-data:/data/db
+    command:
+      [
+        "--configsvr",
+        "--replSet",
+        "config_server",
+        "--bind_ip_all",
+        "--port",
+        "27019"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27019 --quiet || exit 1
+      interval: 10s
+      start_period: 40s
+
+  setup-config:
+    image: mongo:latest
+    container_name: mongo-setup-config
+    volumes:
+      - ./scripts:/scripts
+    networks:
+      - mongo-sharding-network
+    depends_on:
+      configSrv1:
+        condition: service_started
+      configSrv2:
+        condition: service_started
+      configSrv3:
+        condition: service_started
+    entrypoint: ["/bin/bash", "/scripts/mongo-sharding-init-config-servers.sh"]
+
+  # Routers
+  router1:
+    image: mongo:latest
+    container_name: router1
+    restart: always
+    ports:
+      - "27020:27020"
+    networks:
+      - mongo-sharding-network
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "config_server/configSrv1:27017,configSrv2:27018,configSrv3:27019",
+        "--bind_ip_all",
+        "--port",
+        "27020"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27020 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  router2:
+    image: mongo:latest
+    container_name: router2
+    restart: always
+    ports:
+      - "27021:27021"
+    networks:
+      - mongo-sharding-network
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "mongos",
+        "--configdb",
+        "config_server/configSrv1:27017,configSrv2:27018,configSrv3:27019",
+        "--bind_ip_all",
+        "--port",
+        "27021"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27021 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  # Shard 1
+  shard1-master:
+    image: mongo:latest
+    container_name: shard1-master
+    restart: always
+    ports:
+      - "27022:27022"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - shard1-master-data:/data/db
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard1",
+        "--bind_ip_all",
+        "--port",
+        "27022"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27022 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  shard1-replica1:
+    image: mongo:latest
+    container_name: shard1-replica1
+    restart: always
+    ports:
+      - "27024:27024"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - shard1-replica1-data:/data/db
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard1",
+        "--bind_ip_all",
+        "--port",
+        "27024"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27024 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  shard1-replica2:
+    image: mongo:latest
+    container_name: shard1-replica2
+    restart: always
+    ports:
+      - "27025:27025"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - shard1-replica2-data:/data/db
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard1",
+        "--bind_ip_all",
+        "--port",
+        "27025"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27025 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  shard1-replica3:
+    image: mongo:latest
+    container_name: shard1-replica3
+    restart: always
+    ports:
+      - "27026:27026"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - shard1-replica3-data:/data/db
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard1",
+        "--bind_ip_all",
+        "--port",
+        "27026"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27026 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  # Shard 2
+  shard2-master:
+    image: mongo:latest
+    container_name: shard2-master
+    restart: always
+    ports:
+      - "27023:27023"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - shard2-master-data:/data/db
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27023"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27023 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  shard2-replica1:
+    image: mongo:latest
+    container_name: shard2-replica1
+    restart: always
+    ports:
+      - "27027:27027"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - shard2-replica1-data:/data/db
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27027"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27027 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  shard2-replica2:
+    image: mongo:latest
+    container_name: shard2-replica2
+    restart: always
+    ports:
+      - "27028:27028"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - shard2-replica2-data:/data/db
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27028"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27028 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  shard2-replica3:
+    image: mongo:latest
+    container_name: shard2-replica3
+    restart: always
+    ports:
+      - "27029:27029"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - shard2-replica3-data:/data/db
+    depends_on:
+      setup-config:
+        condition: service_completed_successfully
+    command:
+      [
+        "--shardsvr",
+        "--replSet",
+        "shard2",
+        "--bind_ip_all",
+        "--port",
+        "27029"
+      ]
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --port 27029 --quiet || exit 1
+      interval: 10s
+      start_period: 30s
+
+  setup-shards:
+    image: mongo:latest
+    container_name: mongo-setup-shards
+    volumes:
+      - ./scripts:/scripts
+    networks:
+      - mongo-sharding-network
+    depends_on:
+      router1:
+        condition: service_started
+      router2:
+        condition: service_started
+      shard1-master:
+        condition: service_started
+      shard1-replica1:
+        condition: service_started
+      shard1-replica2:
+        condition: service_started
+      shard1-replica3:
+        condition: service_started
+      shard2-master:
+        condition: service_started
+      shard2-replica1:
+        condition: service_started
+      shard2-replica2:
+        condition: service_started
+      shard2-replica3:
+        condition: service_started
+    entrypoint: [ "/bin/bash", "/scripts/mongo-sharding-init-shards.sh" ]
+
+  # ===== REDIS CLUSTER =====
+  # Redis Master 1
+  redis-master-1:
+    image: redis:7-alpine
+    container_name: redis-master-1
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - redis-master-1-data:/data
+      - ./redis/redis-master-1.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      start_period: 20s
+
+  # Redis Slave 1
+  redis-slave-1:
+    image: redis:7-alpine
+    container_name: redis-slave-1
+    restart: always
+    ports:
+      - "6380:6380"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - redis-slave-1-data:/data
+      - ./redis/redis-slave-1.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    depends_on:
+      redis-master-1:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6380", "ping"]
+      interval: 10s
+      start_period: 20s
+
+  # Redis Master 2
+  redis-master-2:
+    image: redis:7-alpine
+    container_name: redis-master-2
+    restart: always
+    ports:
+      - "6381:6381"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - redis-master-2-data:/data
+      - ./redis/redis-master-2.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6381", "ping"]
+      interval: 10s
+      start_period: 20s
+
+  # Redis Slave 2
+  redis-slave-2:
+    image: redis:7-alpine
+    container_name: redis-slave-2
+    restart: always
+    ports:
+      - "6382:6382"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - redis-slave-2-data:/data
+      - ./redis/redis-slave-2.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    depends_on:
+      redis-master-2:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6382", "ping"]
+      interval: 10s
+      start_period: 20s
+
+  # Redis Master 3
+  redis-master-3:
+    image: redis:7-alpine
+    container_name: redis-master-3
+    restart: always
+    ports:
+      - "6383:6383"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - redis-master-3-data:/data
+      - ./redis/redis-master-3.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6383", "ping"]
+      interval: 10s
+      start_period: 20s
+
+  # Redis Slave 3
+  redis-slave-3:
+    image: redis:7-alpine
+    container_name: redis-slave-3
+    restart: always
+    ports:
+      - "6384:6384"
+    networks:
+      - mongo-sharding-network
+    volumes:
+      - redis-slave-3-data:/data
+      - ./redis/redis-slave-3.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    depends_on:
+      redis-master-3:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6384", "ping"]
+      interval: 10s
+      start_period: 20s
+
+  # Redis Cluster Setup
+  redis-cluster-setup:
+    image: redis:7-alpine
+    container_name: redis-cluster-setup
+    networks:
+      - mongo-sharding-network
+    depends_on:
+      redis-master-1:
+        condition: service_healthy
+      redis-slave-1:
+        condition: service_healthy
+      redis-master-2:
+        condition: service_healthy
+      redis-slave-2:
+        condition: service_healthy
+      redis-master-3:
+        condition: service_healthy
+      redis-slave-3:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/redis-cluster-init.sh"]
+    volumes:
+      - ./scripts:/scripts
+
+  # Application
+  pymongo_api:
+    container_name: pymongo_api
+    build:
+      context: api_app
+      dockerfile: Dockerfile
+    depends_on:
+      setup-shards:
+        condition: service_completed_successfully
+      redis-cluster-setup:
+        condition: service_completed_successfully
+    ports:
+      - 8080:8080
+    networks:
+      - mongo-sharding-network
+    environment:
+      MONGODB_URL: "mongodb://router1:27020,router2:27021"
+      MONGODB_DATABASE_NAME: "somedb"
+      REDIS_URL: "redis://redis-master-1:6379,redis-master-2:6381,redis-master-3:6383"
+
+networks:
+  mongo-sharding-network:
+    driver: bridge
+
+volumes:
+  configSrv1-data:
+  configSrv2-data:
+  configSrv3-data:
+  shard1-master-data:
+  shard1-replica1-data:
+  shard1-replica2-data:
+  shard1-replica3-data:
+  shard2-master-data:
+  shard2-replica1-data:
+  shard2-replica2-data:
+  shard2-replica3-data:
+  redis-master-1-data:
+  redis-slave-1-data:
+  redis-master-2-data:
+  redis-slave-2-data:
+  redis-master-3-data:
+  redis-slave-3-data:

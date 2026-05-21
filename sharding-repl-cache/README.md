@@ -4,16 +4,16 @@
 
 Руками настраивать ничего не надо, все настройки шардинга, репликации и кеширования в скриптах в директории scripts, в compose.yaml прописана настройка при помощи этих скриптов.
 
-1. Убедитесь, что находитесь в директории architecture-pro-black-friday/sharding-repl-cache/
+1. Убедитесь, что находитесь в директории architecture-pro-black-friday/Task4/sharding-repl-cache/
 2. Запустите `docker-compose up -d`
 3. Дождитесь окончания сборки
-![img.png](sharding-repl-cache/img/img.png)
+![img.png](img/img.png)
 4. Запустите `docker logs redis-cluster-setup`
 5. Наблюдайте результат настройки редис кластера
-![img.png](sharding-repl-cache/img/img2.png)
+![img.png](img/img2.png)
 6. В браузере можно посмотреть настройки http://localhost:8080
-![img.png](sharding-repl-cache/img/img3.png)
+![img.png](img/img3.png)
 или посчитать документы в коллекции http://localhost:8080/helloDoc/count
-![img.png](sharding-repl-cache/img/img4.png)
+![img.png](img/img4.png)
 или получить юзеров http://localhost:8080/helloDoc/users
-![img.png](sharding-repl-cache/img/img5.png)
+![img.png](img/img5.png)
